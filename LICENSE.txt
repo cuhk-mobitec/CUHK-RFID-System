@@ -1,0 +1,19 @@
++---------------------------------------+
+| CUHK RFID Middleware Licensing Policy |
++---------------------------------------+
+
+CUHK RFID Middleware (hereafter as "CRM") uses a "dual licensing" business model. Under this model, users may choose to use CRM under the free software/open source GNU General Public License (commonly known as the "GPL") or under a commercial license.
+
+For Open Source Projects:
+
+* If you are developing and distributing open source applications under the GPL License, then you are free to use CRM under the GPL License. With the GPL license, CRM is available free of charge, as long as the use of CRM adheres to the terms of GPL license. Users may download the software for free and modify, integrate and distribute it. However, GPL users must abide by the rules of the GPL, which stipulate that if a CRM-based application is redistributed, the complete source code for this application must also be open and available for redistribution. For more information, please visit http://www.gnu.org/licenses/#GPL
+
+---------------------------------------------------------------------
+
+For Commercial Projects:
+
+* For commercial parties who want to use/ distribute CRM with their products, and do not license and distribute their source code under the GPL, CUHK offers a commercial license for organizations that do not want to release the source code for their application. Commercial license customers get a commercially supported product with a level of assurance from the CRM team, without the requirement that their CRM-based software must be "open sourced". CUHK is able to provide a commercial license because it has full ownership of the CRM code. For more information, please contact mobitec@ie.cuhk.edu.hk
+
+---------------------------------------------------------------------
+
+CRM's dual licensing increases freedom in two ways: first, it encourages the growth of free software by licensing CRM under the GPL; second, it makes it possible to use our software in situations where the GPL is not applicable.
