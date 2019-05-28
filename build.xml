@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project basedir="." name="ale" default="all">
+	<property environment="env" />
+	<property file="build.properties" />
+
+	<target name="check-environment">
+		<condition property="env.present">
+			<and>
+				<isset property="env.ANT_HOME" />
+				<isset property="env.JBOSS_HOME" />
+				<isset property="env.JAXWS_HOME" />
+				<isset property="env.XDOCLET_HOME" />
+				<isset property="env.JUNIT_HOME" />
+			</and>
+		</condition>
+		<fail unless="env.present">
+			ANT_HOME, JBOSS_HOME, JAXWS_HOME, XDOCLET_HOME, JUNIT_HOME environment varaible must be set
+		</fail>
+		<!--
+		<echo message="ANT_HOME=${env.ANT_HOME}" />
+		<echo message="JBOSS_HOME=${env.JBOSS_HOME}" />
+		<echo message="JAXWS_HOME=${env.JAXWS_HOME}" />
+		<echo message="XDOCLET_HOME=${env.XDOCLET_HOME}" />
+		<echo message="JUNIT_HOME=${env.JUNIT_HOME}" />
+		-->
+		
+		<available file="${env.JBOSS_HOME}/server/${jboss.server}" type="dir" property="jboss.server.present" />
+		<fail unless="jboss.server.present">
+			${env.JBOSS_HOME}/server/${jboss.server} is not present.
+		</fail>
+	</target>
+
+	<target name="init" depends="check-environment">
+		<path id="jboss.classpath">
+			<fileset dir="${env.JBOSS_HOME}/lib" />
+			<fileset dir="${env.JBOSS_HOME}/server/${jboss.server}/lib" />
+		</path>
+
+		<path id="jaxws.classpath">
+			<fileset dir="${env.JAXWS_HOME}/lib" />
+		</path>
+
+		<path id="xdoclet.classpath">
+			<fileset dir="${env.XDOCLET_HOME}/lib">
+				<!-- exclude xjavadoc and replace with 1.5 jar to support JDK5 syntax -->
+				<exclude name="xjavadoc-1.1.jar" />
+			</fileset>
+		</path>
+
+		<path id="junit.classpath">
+			<fileset dir="${env.JUNIT_HOME}">
+				<include name="*.jar" />
+			</fileset>
+		</path>
+
+		<path id="log4j.classpath">
+			<fileset dir="${env.LOG4J_HOME}/dist/lib">
+				<include name="*.jar" />
+			</fileset>
+		</path>
+
+		<path id="lib.editor.classpath">
+			<fileset dir="${basedir}/lib/editor">
+				<include name="*.jar" />
+			</fileset>
+		</path>
+		
+			
+
+		<property name="generated.home" value="${basedir}/generated" />
+		<property name="build.home" value="${basedir}/bin" />
+		<property name="build.classes.home" value="${build.home}/classes" />
+		<property name="build.lib.home" value="${build.home}/lib" />
+		<property name="build.war.home" value="${build.home}/war" />
+		<property name="build.applet.home" value="${build.home}/applet" />		
+		<property name="javadoc.home" value="${basedir}/docs/api" />
+
+	</target>
+
+	<target name="clean" depends="init">
+		<delete dir="${build.home}" includeEmptyDirs="true" />
+		<delete dir="${generated.home}" includeEmptyDirs="true" />
+		<delete dir="${javadoc.home}" includeEmptyDirs="true" />
+	</target>
+
+	<target name="jax-ws" depends="init" description="generate JAX-WS portable artifacts">
+		<mkdir dir="${build.classes.home}" />
+		<mkdir dir="${generated.home}/src" />
+		<taskdef name="wsimport" classname="com.sun.tools.ws.ant.WsImport">
+			<classpath refid="jaxws.classpath" />
+		</taskdef>
+		<wsimport verbose="true" sourcedestdir="${generated.home}/src" destdir="${build.classes.home}" wsdl="${basedir}/config/wsdl/aleservice.wsdl">
+			<binding dir="${basedir}/config/wsdl" includes="ALE.xjb,EpcGlobal.xjb,aleservice.xml" />
+		</wsimport>
+		<wsimport verbose="true" sourcedestdir="${generated.home}/src" destdir="${build.classes.home}" wsdl="${basedir}/config/wsdl/AleTagDataService.wsdl"
+			package="cuhk.ale.soap">			
+		</wsimport>
+		<!--
+		<wsimport verbose="true" sourcedestdir="${generated.home}/src" destdir="${build.classes.home}" wsdl="http://localhost:8080/ale-ws/aletagdata?wsdl"
+			package="cuhk.ale.soap">			
+		</wsimport>
+		-->
+	</target>
+	
+    <target name="jax-ws-genapt" depends="gen-src,init">
+        <taskdef name="apt" classname="com.sun.tools.ws.ant.Apt">
+            <classpath>
+	        	<path refid="jaxws.classpath"/>
+   				<pathelement location="${java.home}/../lib/tools.jar"/>            
+            </classpath>        	
+        </taskdef>
+        <apt
+        		nocompile="true"
+                fork="true"
+                debug="${debug}"
+                verbose="${verbose}"
+                destdir="${build.classes.home}"
+                sourcedestdir="${generated.home}/src"
+                sourcepath="${basedir}/src:${generated.home}/src">
+            <classpath>
+                <path refid="jaxws.classpath"/>
+                <path refid="jboss.classpath"/>
+   				<pathelement location="${java.home}/../lib/tools.jar"/>            
+                <path refid="log4j.classpath"/>
+            </classpath>
+            <option key="r" value="${build.home}"/>
+            <source dir="${basedir}/src">
+                <include name="**/soap/server/TagDataServiceImpl.java"/>
+                <include name="**/ale/reader/DataSpec.java"/>
+            </source>
+        	<!--
+        	<source dir="${generated.home}/src">
+            	<include name="**/ale/ejb/interfaces/TagData*.java"/>        		
+        	</source>
+        	-->
+        </apt>
+    </target>
+
+	<target name="xdoclet" depends="init" description="generate EJB artifacts">
+		<mkdir dir="${generated.home}/src" />
+		<mkdir dir="${generated.home}/config" />
+		<taskdef name="ejbdoclet" classname="xdoclet.modules.ejb.EjbDocletTask">
+			<classpath refid="xdoclet.classpath" />
+			<classpath refid="jboss.classpath" />
+		</taskdef>
+		<ejbdoclet ejbSpec="2.0" excludedTags="@version,@author,@todo" destDir="${generated.home}/src" verbose="true" addedTags="@xdoclet-generated at ${TODAY},@copyright The XDoclet Team,@author XDoclet,@version ${version}">
+			<fileset dir="${basedir}/src" includes="**/ejb/*Bean.java" />
+			<packageSubstitution packages="ejb" substituteWith="ejb.interfaces" />
+			<remoteinterface />
+			<localinterface />
+			<homeinterface />
+			<localhomeinterface />
+			<valueobject>
+				<PackageSubstitution packages="ejb" substituteWith="valueobjects" />
+			</valueobject>
+			<entitypk />
+			<entitycmp />
+			<entitybmp />
+			<session />
+			<dao>
+				<PackageSubstitution packages="ejb" substituteWith="dao" />
+			</dao>
+			<utilobject Kind="physical" includeGUID="true" cacheHomes="true">
+			</utilobject>
+			<deploymentdescriptor validateXML="true" destDir="${generated.home}/config/ejb/META-INF" />
+			<jboss Version="3.0" destDir="${generated.home}/config/ejb/META-INF" />
+			<entityfacade acceptInterfaces="" acceptAbstractClasses="" />
+		</ejbdoclet>
+	</target>
+
+	<target name="jndi" depends="init" description="copy jndi.properties from jboss">
+		<mkdir dir="${generated.home}/config/jndi" />
+		<copy verbose="true" file="${env.JBOSS_HOME}/server/${jboss.server}/conf/jndi.properties" todir="${generated.home}/config/jndi" />
+	</target>
+
+	<target name="gen-src" depends="jax-ws,xdoclet" description="generate all sources" />
+
+	<target name="javadoc" depends="compile,gen-src" description="generate javadoc">
+		<mkdir dir="${javadoc.home}" />
+		<javadoc 
+			destdir="${javadoc.home}" 
+			excludepackagenames="javax:cuhk.ale.dao:cuhk.ale.ejb" >
+			
+			<classpath>
+				<path refid="jaxws.classpath" />
+				<path refid="jboss.classpath" />
+				<path location="${build.classes.home}"/>
+			</classpath>			
+
+			<fileset dir="${generated.home}/src">
+				<include name="epcglobal/**/*.java"/>
+				<include name="org/**/*.java"/>
+				<include name="cuhk/ale/soap/*.java"/>
+				<include name="cuhk/ale/ejb/interfaces/**/*.java"/>
+			</fileset>
+			
+			<!-- 
+			<fileset dir="${generated.home}/src">
+				<exclude name="cuhk/ale/soap/server/**/*.java"/>
+			</fileset>
+			
+			<fileset dir="${basedir}/src" >
+	            <include name="cuhk/ale/exceptions/**/*.java"/>
+			</fileset>
+			-->			
+			
+			<tag name="copyright" description="copyright" enabled="false"/>
+			<tag name="xdoclet-generated" description="xdoclet-generated" enabled="false"/>
+
+		</javadoc>
+	</target>
+
+	<target name="compile" depends="jax-ws-genapt,gen-src" description="compile the src">
+		<mkdir dir="${build.classes.home}" />
+		<javac debug="${debug}" srcdir="${basedir}/src:${generated.home}/src" destdir="${build.classes.home}">
+			<include name="cuhk/ale/*.java" />
+			<include name="cuhk/ale/dao/**/*.java" />
+			<include name="cuhk/ale/ejb/**/*.java" />
+			<include name="cuhk/ale/exceptions/**/*.java" />
+			<include name="cuhk/ale/valueobjects/**/*.java" />
+			<include name="cuhk/ale/reader/**/*.java" />
+			<include name="cuhk/ale/soap/**/*.java" />
+			<include name="cuhk/ale/client/**/*.java" />
+			<include name="epcglobal/**/*.java" />
+			<include name="org/**/*.java" />
+
+			<classpath refid="jaxws.classpath" />
+			<classpath refid="xdoclet.classpath" />
+			<classpath refid="jboss.classpath" />
+			<classpath refid="junit.classpath" />
+			<!--<compilerarg value="-Xlint:unchecked"/>-->
+		</javac>
+	</target>
+
+	
+	<target name="compile-editor" depends="init" description="compile the src of editor">
+		<mkdir dir="${build.classes.home}" />
+		<javac debug="${debug}" srcdir="${basedir}/src:${generated.home}/src" destdir="${build.classes.home}">
+			<include name="cuhk/ale/editor/**/*.java" />
+			<classpath refid="lib.editor.classpath" />
+			<classpath refid="jaxws.classpath" />
+			<classpath refid="xdoclet.classpath" />
+			<classpath refid="jboss.classpath" />
+			<classpath refid="junit.classpath" />
+			<!--<compilerarg value="-Xlint:unchecked"/>-->
+		</javac>
+	</target>
+
+	<target name="compile-soap" depends="init" description="compile the src of package">
+		<mkdir dir="${build.classes.home}" />
+		<javac debug="${debug}" srcdir="${basedir}/src:${generated.home}/src" destdir="${build.classes.home}">
+			<include name="epcglobal/ale/**/*.java" />
+			<include name="cuhk/ale/reader/**/*.java" />
+			<classpath refid="jaxws.classpath" />
+			<classpath refid="xdoclet.classpath" />
+			<classpath refid="jboss.classpath" />
+			<classpath refid="junit.classpath" />
+			<!--<compilerarg value="-Xlint:unchecked"/>-->
+		</javac>
+	</target>
+
+
+	<target name="package-ejb" depends="compile" description="package the EJB">
+		<mkdir dir="${build.lib.home}" />
+		<!--ejb server file-->
+		<jar destfile="${build.lib.home}/${outfile.ejb}">
+			<zipfileset dir="${generated.home}/config/ejb/META-INF" prefix="META-INF">
+				<include name="ejb-jar.xml" />
+			</zipfileset>
+			<zipfileset dir="${generated.home}/config/ejb/META-INF" prefix="META-INF">
+				<include name="jboss.xml" />
+			</zipfileset>
+			<zipfileset dir="${build.classes.home}">
+				<include name="cuhk/ale/*.class" />
+				<include name="cuhk/ale/dao/**/*.class" />
+				<include name="cuhk/ale/ejb/**/*.class" />
+				<include name="cuhk/ale/exceptions/**/*.class" />
+				<include name="cuhk/ale/valueobjects/**/*.class" />
+				<include name="cuhk/ale/reader/**/*.class" />
+				<include name="cuhk/ale/soap/**/*.class" />
+				<include name="epcglobal/**/*.class" />
+				<include name="org/**/*.class" />
+			</zipfileset>
+		</jar>
+		<!--ejb client library-->		
+		<jar destfile="${build.lib.home}/${outfile.ejb-client}">
+			<zipfileset dir="${build.classes.home}">
+				<include name="cuhk/ale/ejb/interfaces/ReaderManager*.class" />
+				<include name="cuhk/ale/PhysicalReaderInfo.class" />
+				<include name="cuhk/ale/Grammar.class" />
+			</zipfileset>
+		</jar>		
+	</target>
+
+	<target name="package-war" depends="compile" description="package the WAR">
+		<mkdir dir="${build.lib.home}" />
+		<war warfile="${build.lib.home}/${outfile.war}" webxml="config/war/web.xml">
+			<webinf dir="${basedir}/config/war" includes="sun-jaxws.xml" />
+			<zipfileset dir="${basedir}/config/wsdl" includes="*.wsdl, *.xsd" prefix="WEB-INF/wsdl" />
+			<classes dir="${build.classes.home}/epcglobal/ale" />
+		</war>
+	</target>
+
+	<target name="package-ear" depends="package-war,package-ejb" description="package the EAR">
+		<jar destfile="${build.lib.home}/${outfile.ear}">
+			<zipfileset dir="${basedir}/config/ear/" prefix="META-INF">
+				<include name="application.xml" />
+			</zipfileset>
+			<zipfileset dir="${build.lib.home}" includes="${outfile.ejb},${outfile.war}">
+			</zipfileset>
+		</jar>
+	</target>
+
+	<target name="package-soap" depends="compile-soap" description="package the soap libraries">
+		<mkdir dir="${build.lib.home}" />
+		<jar destfile="${build.lib.home}/${outfile.soap}">
+			<zipfileset dir="${build.classes.home}">
+				<include name="epcglobal/ale/**/*.class" />
+				<include name="org/**/*.class" />
+				<include name="cuhk/ale/CustomDatatypeConverter.class" />
+				<include name="cuhk/ale/reader/*.class" />
+				<include name="cuhk/ale/soap/*.class" />				
+			</zipfileset>
+		</jar>
+	</target>
+
+	<target name="package-cmdline" depends="init" description="package the other libraries">
+		<mkdir dir="${build.lib.home}" />
+		<jar destfile="${build.lib.home}/ale-cmdline.jar">
+			<zipfileset dir="${build.classes.home}">
+				<include name="cuhk/ale/client/TagData*.class" />
+			</zipfileset>
+		</jar>
+	</target>
+	
+	<target name="package-emulator" depends="package-ejb" description="package the reader emulator applet">
+		<mkdir dir="${build.applet.home}" />
+		<jar destfile="${build.applet.home}/${outfile.emulator}">
+			<zipfileset dir="${build.classes.home}">
+				<include name="cuhk/ale/client/ReaderEmulator*.class" />
+			</zipfileset>
+		</jar>
+		<copy verbose="true" file="${build.lib.home}/${outfile.ejb-client}" todir="${build.applet.home}/lib" />		
+		<copy verbose="true" file="${env.JBOSS_HOME}/client/jbossall-client.jar" todir="${build.applet.home}/lib" />
+		<copy verbose="true" file="${env.JBOSS_HOME}/client/jboss-common-client.jar" todir="${build.applet.home}/lib" />
+		<copy verbose="true" file="${env.JBOSS_HOME}/client/jbossha-client.jar" todir="${build.applet.home}/lib" />
+		<copy verbose="true" file="${env.JBOSS_HOME}/client/jboss-j2ee.jar" todir="${build.applet.home}/lib" />
+		<copy verbose="true" file="${env.JBOSS_HOME}/client/jnp-client.jar" todir="${build.applet.home}/lib" />
+		<copy verbose="true" file="${env.JBOSS_HOME}/client/jbossall-client.jar" todir="${build.applet.home}/lib" />
+	
+		<signjar alias="signFiles" storepass="cuhkrfid" keystore="${basedir}/config/applet/cuhkstore">
+			<fileset dir="${build.applet.home}">
+				<include name="${outfile.emulator}" />
+				<include name="lib/jbossall-client.jar" />
+			</fileset>
+		</signjar>	
+
+		<copy verbose="true" todir="${build.applet.home}">
+			<fileset dir="${basedir}/config/applet/html" />
+		</copy>
+	</target>	
+
+	<target name="test" depends="init" description="">
+
+	</target>		
+	
+	<target name="run-cmdline" depends="init" description="">
+		<java classname="cuhk.ale.client.TagDataCommand" fork="yes">
+			<classpath path="${build.classes.home}"/>
+			<classpath refid="jaxws.classpath" />
+			<sysproperty key="soap_ip" value="localhost"/>
+			<sysproperty key="soap_port" value="8080"/>
+			<sysproperty key="mode" value="${mode}"/>
+			<!-- sysproperty key="reader_id" value="${reader_id}"/-->				
+			<sysproperty key="tag_id" value="${tag_id}"/>				
+			<sysproperty key="data" value="${data}"/>				
+		</java>		
+	</target>		
+	
+	
+	<target name="package-editor" depends="compile-editor" description="package the editor">
+		
+		<mkdir dir="${build.lib.home}" />
+		<jar destfile="${build.lib.home}/${outfile.editor}">
+			<zipfileset dir="${build.classes.home}">
+				<include name="cuhk/ale/editor/**/*.class" />
+			</zipfileset>
+			<zipfileset dir="${basedir}/src">
+				<include name="cuhk/ale/editor/**/*.properties" />
+			</zipfileset>
+			<zipfileset dir="${build.classes.home}">
+				<include name="cuhk/ale/*.class" />
+			</zipfileset>
+			<zipfileset dir="${basedir}/config/editor">
+				<include name="*.txt" />
+			</zipfileset>
+			<zipfileset dir="${build.classes.home}">
+				<include name="epcglobal/**"/>
+				<include name="org/**"/>
+			</zipfileset>
+			
+		</jar>
+	</target>
+
+	<target name="run-tagdata" depends="init" description="run the tagdata rmi ">
+		<java classname="cuhk.ale.reader.TagDataImpl" fork="yes">
+			<env key="java.naming.factory.initial" value="com.sun.jndi.rmi.registry.RegistryContextFactory"/>
+			<classpath path="${build.classes.home}"/>			
+			<classpath refid="jboss.classpath" />
+			<classpath refid="jaxws.classpath" />
+			<classpath refid="log4j.classpath" />
+		</java>		
+	</target>
+	
+	<target name="run-editor" depends="package-editor" description="run the editor">
+		<java classname="cuhk.ale.editor.view.Console" fork="yes">
+		    <jvmarg value="-Djava.library.path=${basedir}/lib/editor"/>			
+			<classpath path="${build.lib.home}/${outfile.editor}"/>
+			<classpath path="${build.lib.home}/${outfile.soap}"/>
+			<classpath refid="lib.editor.classpath" />
+			<classpath refid="jaxws.classpath" />
+			<classpath refid="log4j.classpath" />
+		</java>		
+	</target>
+
+	<!-- not working due to classpath issue 
+	<target name="run-editor-jar" depends="init" description="run the editor in jar">
+		<java jar="${build.lib.home}/${outfile.editor}" fork="yes">
+		    <jvmarg value="-Djava.library.path=${basedir}/lib/editor"/>			
+			<classpath path="${build.lib.home}/${outfile.soap}"/>
+			<classpath path="${basedir}/lib/editor"/>
+			<classpath refid="lib.editor.classpath" />
+			<classpath refid="jaxws.classpath" />
+			<classpath refid="log4j.classpath" />
+		</java>		
+	</target>
+	-->
+
+	<!-- disable clean in all 
+	<target name="all" depends="clean,javadoc,package-ear" />
+	-->
+	<target name="all" depends="javadoc,package-ear" />
+
+	<target name="configure-jboss" depends="check-environment">
+		<copy verbose="true" file="config/jboss/mysql-ds.xml" todir="${env.JBOSS_HOME}/server/${jboss.server}/deploy" />
+		<delete file="${env.JBOSS_HOME}/server/${jboss.server}/lib/mysql-connector-java-3.1.12-bin.jar" />
+		<copy verbose="true" file="config/jboss/mysql-connector-java-5.0.3-bin.jar" todir="${env.JBOSS_HOME}/server/${jboss.server}/lib" />
+		<copy verbose="true" todir="${env.JBOSS_HOME}/server/${jboss.server}/lib">
+			<fileset dir="${env.JAXWS_HOME}/lib" />
+		</copy>
+		<copy verbose="true" file="config/jboss/jbossmq-destinations-service.xml" todir="${env.JBOSS_HOME}/server/${jboss.server}/deploy/jms" />
+	</target>
+
+	<target name="configure-xdoclet" depends="check-environment">
+		<copy verbose="true" file="config/xdoclet/xjavadoc-1.5-snapshot050611.jar" todir="${env.XDOCLET_HOME}/lib" />
+	</target>
+
+	<target name="configure" depends="configure-jboss,configure-xdoclet" />
+
+</project>

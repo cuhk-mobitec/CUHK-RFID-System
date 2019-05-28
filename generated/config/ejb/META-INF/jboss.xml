@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE jboss PUBLIC "-//JBoss//DTD JBOSS 3.0//EN" "http://www.jboss.org/j2ee/dtd/jboss_3_0.dtd">
+
+<jboss>
+
+   <enterprise-beans>
+
+     <!--
+       To add beans that you have deployment descriptor info for, add
+       a file to your XDoclet merge directory called jboss-beans.xml that contains
+       the <session></session>, <entity></entity> and <message-driven></message-driven>
+       markup for those beans.
+     -->
+
+      <entity>
+         <ejb-name>ECSpecInstance</ejb-name>
+         <local-jndi-name>ejb/ECSpecInstanceLocal</local-jndi-name>
+
+         <resource-ref>
+            <res-ref-name>mySQLDS</res-ref-name>
+            <jndi-name>java:/mySQLDS</jndi-name>
+         </resource-ref>
+
+        <method-attributes>
+              <method-name>get*</method-name>
+              <read-only>true</read-only>
+        </method-attributes>
+      </entity>
+
+      <session>
+         <ejb-name>TagDataService</ejb-name>
+         <jndi-name>ejb/TagDataService</jndi-name>
+         <local-jndi-name>TagDataServiceLocal</local-jndi-name>
+
+         <resource-ref>
+            <res-ref-name>mySQLDS</res-ref-name>
+            <jndi-name>java:/mySQLDS</jndi-name>
+         </resource-ref>
+
+      </session>
+      <session>
+         <ejb-name>ReaderManager</ejb-name>
+         <jndi-name>ejb/ReaderManager</jndi-name>
+         <local-jndi-name>ReaderManagerLocal</local-jndi-name>
+
+         <resource-ref>
+            <res-ref-name>mySQLDS</res-ref-name>
+            <jndi-name>java:/mySQLDS</jndi-name>
+         </resource-ref>
+
+      </session>
+      <session>
+         <ejb-name>ReportGenerator</ejb-name>
+         <jndi-name>ejb/ReportGenerator</jndi-name>
+         <local-jndi-name>ReportGeneratorLocal</local-jndi-name>
+
+         <resource-ref>
+            <res-ref-name>mySQLDS</res-ref-name>
+            <jndi-name>java:/mySQLDS</jndi-name>
+         </resource-ref>
+
+      </session>
+      <session>
+         <ejb-name>ALEService</ejb-name>
+         <jndi-name>ejb/ALEService</jndi-name>
+         <local-jndi-name>ALEServiceLocal</local-jndi-name>
+
+      </session>
+
+      <message-driven>
+         <ejb-name>TagWriteActivator</ejb-name>                       
+         <destination-jndi-name>queue/TagWriteActivatorQueue</destination-jndi-name>
+
+      </message-driven>
+      <message-driven>
+         <ejb-name>Notifier</ejb-name>                       
+         <destination-jndi-name>queue/NotifierQueue</destination-jndi-name>
+
+      </message-driven>
+    <!--
+      write a merge file jboss-webservices.ent for webservice-description 
+    -->
+
+   </enterprise-beans>
+
+   <resource-managers>
+   </resource-managers>
+
+  <!--
+    | for container settings, you can merge in jboss-container.xml
+    | this can contain <invoker-proxy-bindings/> and <container-configurations/>
+  -->
+
+</jboss>

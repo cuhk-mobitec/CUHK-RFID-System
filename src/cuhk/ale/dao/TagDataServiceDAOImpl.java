@@ -1,0 +1,79 @@
+package cuhk.ale.dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.naming.InitialContext;
+import javax.sql.DataSource;
+
+import org.apache.log4j.Logger;
+
+public class TagDataServiceDAOImpl implements TagDataServiceDAO {
+
+	static Logger logger = Logger.getLogger(TagDataServiceDAOImpl.class
+			.getName());
+
+	private DataSource jdbcFactory;
+
+	public void init() {
+		InitialContext c = null;
+		if (this.jdbcFactory == null) {
+			try {
+				c = new InitialContext();
+				this.jdbcFactory = (DataSource) c
+						.lookup("java:comp/env/mySQLDS");
+			} catch (Exception e) {
+				logger.error("Error in TagDataServiceDAOImpl.init()");
+				e.printStackTrace();
+
+			}
+		}
+	}
+
+	public List getReaders(String tagID) {
+		logger.info("TagDataServiceDAOImpl.getTags");
+
+		Connection conn = null;
+		PreparedStatement ps = null;
+		ResultSet rs = null;
+
+		List<List> result = new ArrayList<List>();
+		try {
+			conn = jdbcFactory.getConnection();
+			String queryString = 
+				"select distinct a.reader_id, ipaddress " +
+				"  from read_event as a, " +
+				"  (select event_id from read_tag as b where b.tag_id = ? order by event_id desc limit 1) as b, " +
+				"  reader as c " +
+				" where " +
+				"  (a.event_id=b.event_id) " +
+				"  AND a.reader_id=c.reader_id " ;
+
+			ps = conn.prepareStatement(queryString);
+			ps.setString(1, tagID);
+			rs = ps.executeQuery();
+			while (rs.next()) {
+				List<String> reader_data = new ArrayList<String>();
+				reader_data.add(rs.getString("reader_id"));
+				reader_data.add(rs.getString("ipaddress"));
+				result.add(reader_data);
+			}
+		
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				rs.close();
+				ps.close();
+				conn.close();
+			} catch (Exception e) {
+			}
+		}
+		return result;
+	}
+
+}

@@ -1,0 +1,1 @@
+delete from read_event; delete from read_tag;

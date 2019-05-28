@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ale:ECSpec xmlns:ale="urn:epcglobal:ale:xsd:1"
+            xmlns:epcglobal="urn:epcglobal:xsd:1"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="urn:epcglobal:ale:xsd:1 Ale.xsd"
+            schemaVersion="1.0"
+            creationDate="2003-08-06T10:54:06.444-05:00">
+    <logicalReaders>
+        <logicalReader>READERS_2</logicalReader>
+    </logicalReaders>
+    <boundarySpec>
+<!--    <startTrigger>http://sample.com/trigger1</startTrigger>  -->
+        <repeatPeriod unit="MS">3000</repeatPeriod>
+<!-- <stopTrigger>http://sample.com/trigger2</stopTrigger>  -->        
+        <duration unit="MS">3000</duration>
+    </boundarySpec>
+    <reportSpecs>
+        <reportSpec reportName="report1">
+            <reportSet set="CURRENT"/>
+            <output includeTag="true"/>
+        </reportSpec>
+    </reportSpecs>
+</ale:ECSpec>

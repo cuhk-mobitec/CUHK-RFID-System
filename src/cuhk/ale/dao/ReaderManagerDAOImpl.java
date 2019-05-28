@@ -1,0 +1,250 @@
+package cuhk.ale.dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.naming.InitialContext;
+import javax.sql.DataSource;
+
+import org.apache.log4j.Logger;
+
+import cuhk.ale.PhysicalReaderInfo;
+
+public class ReaderManagerDAOImpl implements ReaderManagerDAO {
+
+	static Logger logger = Logger.getLogger(ReportGeneratorDAOImpl.class.getName( ));
+	static int RETRIEVE_READER_BY_TAG_LIMIT = 10;
+	
+	private DataSource jdbcFactory;
+	
+	public void init() {
+		InitialContext c = null;
+		if (this.jdbcFactory == null) {
+			try {
+				c = new InitialContext();
+				this.jdbcFactory = (DataSource) c.lookup("java:comp/env/mySQLDS");
+			}
+			catch (Exception e) {
+				logger.error("Error in DaoImpl.init()");
+				e.printStackTrace();
+				
+			}
+		}
+	}
+	
+	public void submitTags(String readerID, List tags) throws Exception {		
+		Connection conn = null;
+		PreparedStatement ps = null;
+		ResultSet rs = null;
+	
+		String sql_INSERT_EVENT = "INSERT INTO read_event VALUES(NULL,?,SYSDATE())";
+		String sql_INSERT_TAG = "INSERT INTO read_tag VALUES(LAST_INSERT_ID(),?)";
+		
+		int count = 0;
+		
+		try {
+			conn = jdbcFactory.getConnection();
+			ps = conn.prepareStatement(sql_INSERT_EVENT);
+			ps.setString (1, readerID);
+			count = ps.executeUpdate ();
+			ps.close();
+			
+			ps = conn.prepareStatement(sql_INSERT_TAG);
+			for (Object tag : tags) {
+				ps.setString(1,(String) tag);
+				ps.executeUpdate();
+			}
+			ps.close();
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+			throw e;
+		}
+		finally {
+	        if (conn != null) {
+	            try {conn.close ();}
+	            catch (Exception e) {}
+	        }
+		}
+	}	
+	
+	public boolean isPhysicalReaderExists(String readerID) throws Exception {
+
+		Connection conn = null;
+		PreparedStatement ps = null;
+		ResultSet rs = null;
+	
+		boolean result=false;
+		
+		try {
+			conn = jdbcFactory.getConnection();
+			
+			String queryString = "select reader_id from reader where reader_id='" + readerID + "'";			
+			logger.debug(queryString);
+			ps = conn.prepareStatement(queryString);
+		
+			rs = ps.executeQuery();
+
+			if (rs.next()) {
+				result=true;
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			throw e;
+		}
+		finally {
+			try {
+				rs.close();
+				ps.close();
+				conn.close();
+			}
+			catch (Exception e) {
+			}
+		}
+		return result;		
+	}
+	
+	public void insertPhysicalReaderInfo(String readerID, PhysicalReaderInfo physicalReaderInfo) throws Exception {
+		Connection conn = null;
+		PreparedStatement ps = null;
+	
+		String sql_INSERT = "INSERT INTO reader VALUES(?,?,?,?,?)";
+	
+		try {
+			conn = jdbcFactory.getConnection();
+			ps = conn.prepareStatement(sql_INSERT);
+			ps.setString (1, readerID);
+			ps.setBoolean(2, false);
+			ps.setString(3, physicalReaderInfo.getManufacturer());
+			ps.setString(4, physicalReaderInfo.getModel());
+			ps.setString(5, physicalReaderInfo.getIPAddress());
+			ps.executeUpdate();
+			ps.close();
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+			throw e;
+		}
+		finally {
+	        if (conn != null) {
+	            try {conn.close ();}
+	            catch (Exception e) {}
+	        }
+		}		
+	}
+	
+	public void updatePhysicalReaderInfo(String readerID, PhysicalReaderInfo physicalReaderInfo) throws Exception {
+		Connection conn = null;
+		PreparedStatement ps = null;
+	
+		String sql_UPDATE = "UPDATE reader SET manufacturer=?, model=?, ipaddress=? where reader_id=?";
+	
+		try {
+			conn = jdbcFactory.getConnection();
+			ps = conn.prepareStatement(sql_UPDATE);
+			ps.setString(1, physicalReaderInfo.getManufacturer());
+			ps.setString(2, physicalReaderInfo.getModel());
+			ps.setString(3, physicalReaderInfo.getIPAddress());
+			ps.setString (4, readerID);
+			ps.executeUpdate();
+			ps.close();
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+			throw e;
+		}
+		finally {
+	        if (conn != null) {
+	            try {conn.close ();}
+	            catch (Exception e) {}
+	        }
+		}		
+	}
+
+	public List<String> retrieveLogicalReaderNames() throws Exception {
+		
+		Connection conn = null;
+		PreparedStatement ps = null;
+		ResultSet rs = null;
+		
+		List<String> result = null;
+			
+		try {
+			result = new ArrayList<String>();
+			
+			conn = jdbcFactory.getConnection();
+			
+			String queryString = "select logicalreader_id from logicalreader where suppress = 0 ";			
+			logger.debug(queryString);
+			ps = conn.prepareStatement(queryString);
+		
+			rs = ps.executeQuery();
+
+			while (rs.next()) {
+				result.add(rs.getString("logicalreader_id"));
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			throw e;
+		}
+		finally {
+			try {
+				rs.close();
+				ps.close();
+				conn.close();
+			}
+			catch (Exception e) {
+			}
+		}
+		return result;		
+	}
+	
+	public List<String> retrieveReaderNamesFromTag(String tag) throws Exception {
+		
+		Connection conn = null;
+		PreparedStatement ps = null;
+		ResultSet rs = null;
+		
+		// FIXME move this to Set to avoid reader_id duplication...
+		List<String> result = null;
+			
+		try {
+			result = new ArrayList<String>();
+			
+			conn = jdbcFactory.getConnection();
+			
+			String queryString = 
+				" select reader_id from read_event, read_tag " + 
+				" where read_event.event_id=reag_tag.event_id and tag_id=? " +
+				" order by timestamp limit " + RETRIEVE_READER_BY_TAG_LIMIT  ;
+			
+			logger.debug(queryString);
+			ps = conn.prepareStatement(queryString);
+			ps.setString(1, tag);
+			rs = ps.executeQuery();
+
+			while (rs.next()) {
+				result.add(rs.getString("reader_id"));
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			throw e;
+		}
+		finally {
+			try {
+				rs.close();
+				ps.close();
+				conn.close();
+			}
+			catch (Exception e) {
+			}
+		}
+		return result;		
+	}
+}
